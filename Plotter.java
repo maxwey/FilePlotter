@@ -1,21 +1,28 @@
 /**
+ * @author Maxence Weyrich
+ * @version 8/2/2017
+ *
+ *
  * A quick note about the format of files:
  *
- * the files must have all the points in X Y order with a space separating all data points.
+ * the input files must have all the points in X Y order with a space separating all data points.
  * All data must appear in pairs; an odd number of data points will cause an error to be generated.
  *
  * The program also accepts an optional format specifier in the following formats:
  *
  * color can be specified with : {R,G,B}
- * where R, G, B are 0-255 representing red, green and blue.
+ * where R, G, B are integer values between 0-255 representing red, green and blue, respectively
  *
  * size can be specified with : [S]
  * where S is a positive integer. (behavior unspecified with negative values)
  *
+ * Default color is black, and default size is 7.
+ *
  * Note that these formatting options must appear immediately after the Y coordinate, and there must be
- * whitespace separating each specifier. The color specifier must be before the size specifier.
+ * whitespace separating each specifier. If both specifiers are used, the color specifier MUST be before the size specifier.
+ *
+ * Sample input files are available to see and try at https://github.com/maxwey/FilePlotter/tree/master/examples
  */
-
 
 import java.io.*;
 import java.util.*;
