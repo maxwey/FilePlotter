@@ -5,7 +5,7 @@ that each number entry is separated by whitespace.
 
 ### Usage
 
-Java required. Compile `Plotter.java` there should be several `.class` files created. Run `java Plotter INPUT_FILE` to plot the specified file.
+Java required. Compile `Plotter.java` and run `java Plotter INPUT_FILE` to plot the specified file.
 
 ### A quick note about the format of input files
 
@@ -22,8 +22,8 @@ where `S` is a positive integer. (behavior unspecified with negative values)
 
 Default color is black, and default size is 7.
 
-Note that these formatting options must appear immediately after the Y coordinate, and there must be
-whitespace separating each specifier. If both specifiers are used, the color specifier MUST be before the size specifier.
+Note that these formatting options must appear after the Y coordinate of the point to modify, and there must be
+whitespace between each specifier and between the points and the specifiers. If both specifiers are used, the color specifier MUST be before the size specifier.
 
 **Sample input files are available to see and try at https://github.com/maxwey/FilePlotter/tree/master/examples**
 
