@@ -1,12 +1,14 @@
 /**
  * @author Maxence Weyrich
- * @version 8/2/2017
+ * @version 5/11/2018
  *
  *
  * A quick note about the format of files:
  *
- * the input files must have all the points in X Y order with a space separating all data points.
+ * the input files must have all the points in X Y order with a space separating all data points (by default).
  * All data must appear in pairs; an odd number of data points will cause an error to be generated.
+ * Custom format can also be specified, see below for more information.
+ *
  *
  * The program also accepts an optional format specifier in the following formats:
  *
@@ -19,14 +21,40 @@
  * Default color is black, and default size is 7.
  *
  * Note that these formatting options must appear immediately after the Y coordinate, and there must be
- * whitespace separating each specifier. If both specifiers are used, the color specifier MUST be before the size specifier.
+ * whitespace separating each specifier.
  *
  * Sample input files are available to see and try at https://github.com/maxwey/FilePlotter/tree/master/examples
+ *
+ *
+ *
+ * Format specifiers at the top of the input files to indicate the structure of the following file are optional
+ * but can be specified for non-conventional file formats. All header format specifers must occur at the very
+ * top of the file, and start with double pound symbols (##)
+ *
+ * Available specifiers include:
+ * FORMAT: %x %y
+ *    The text following the FORMAT can be anything, but must include the %x and the %y, as these indicate
+ *    where in the text the x and y coordinates are located. Note that is it not recommended to have the
+ *    same format as the color/size specifiers as it may cause parsing conflicts
+ *
+ *    For example: a format of (%y...%x) would indicate that the data (5...3)
+ *    would represent an x-coordinate of 3 and a y-coordinate of 5
+ *
+ * SIZEDEFAULT: S
+ *    SIZEDEFAULT must be followed by a non-negative integer, S, that specifies the default size of the
+ *    points in the graph. This can still be overridden by the [##] format specifiers
+ *
+ * COLORDEFAULT: {R,G,B}
+ *    COLORDEFAULT must be followed by R,G,B values where R, G, and B are integer values between 0 and 255,
+ *    where each number represents red, green and blue. The required format is the same as the one for
+ *    inline format specifiers
+ *
  */
 
 import java.io.*;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import javax.swing.*;
 import java.awt.*;
 
@@ -34,9 +62,17 @@ public class Plotter {
 
    private JPanel panel;
    private ArrayList<DrawableItem> itemsToDraw;
+
+   private int defaultSize = 7;
+   private Color defaultColor = Color.BLACK;
+   private Pattern defaultData = Pattern.compile("(?<x>.+?)\\s+(?<y>.+?)(?:\\s+(?<F>.*)|$)");
+
    // create the Reg-ex search patterns for the file fomatting
-   private static final Pattern POINT_COLOR_PATTERN = Pattern.compile("\\{\\d{1,3},\\d{1,3},\\d{1,3}\\}");
-   private static final Pattern POINT_SIZE_PATTERN = Pattern.compile("\\[\\d+\\]");
+   private static final Pattern POINT_COLOR_PATTERN = Pattern.compile("\\{(\\d{1,3}),(\\d{1,3}),(\\d{1,3})\\}");
+   private static final Pattern POINT_SIZE_PATTERN = Pattern.compile("\\[(\\d+)\\]");
+   private static final Pattern HEADER_PATTERN = Pattern.compile("##.*");
+   private static final Pattern FORMAT_EXTRACT_PATTERN = Pattern.compile("##(.+):(.+)");
+
 
    public static void main(String[] args) throws FileNotFoundException {
       if(args.length < 1) throw new IllegalArgumentException("Expected filename in arguments");
@@ -68,6 +104,39 @@ public class Plotter {
       start(new Scanner(new File(fileName)));
    }
 
+   /*
+    * Parses the given key & value and sets the appropriate settings based on the values
+    * read.
+    * Currently returns nothing (has no effect :^( )
+    */
+   private void parseFormat(String key, String value) {
+      key = key.trim().toUpperCase();
+
+      if(key.equals("FORMAT")) { // User has specified a custom file formatting
+         value = Pattern.quote(value);
+         value = value.replaceFirst("%x", "\\\\E(?<x>.+?)\\\\Q");
+         value = value.replaceFirst("%y", "\\\\E(?<y>.+?)\\\\Q");
+         value += "(?:\\s+(?<F>.*)|$)";
+         this.defaultData = Pattern.compile(value);
+         //System.out.println(value);
+
+      } else if(key.equals("SIZEDEFAULT")) { // User has specified as custom default size
+         this.defaultSize = Integer.parseInt(value);
+      } else if(key.equals("COLORDEFAULT")) {
+         Matcher matcher = POINT_COLOR_PATTERN.matcher(value);
+         matcher.find();
+
+         int r = Integer.parseInt(matcher.group(1));
+         int g = Integer.parseInt(matcher.group(2));
+         int b = Integer.parseInt(matcher.group(3));
+
+         this.defaultColor = new Color(r, g, b);
+      }
+
+   }
+
+
+
    /**
     * Parses the given file using the given Scanner, and creates the basic items needed for the plotter including:
     * - Axis
@@ -88,39 +157,65 @@ public class Plotter {
       ax.setTopOffset(30);
       itemsToDraw.add(ax);
 
+      scan.useDelimiter("(\r)*(\n)+");
+
+
+      //process header
+      while(scan.hasNext(FORMAT_EXTRACT_PATTERN)) {
+
+            String headerData = scan.next(FORMAT_EXTRACT_PATTERN);
+            Matcher matcher = FORMAT_EXTRACT_PATTERN.matcher(headerData);
+            matcher.find();
+            parseFormat(matcher.group(1).trim(), matcher.group(2).trim());
+
+      }
+
+
+      //scan.useDelimiter("\\s+");
+      //process data
       ArrayList<Point> points = new ArrayList<Point>();
       while(scan.hasNext()) {
          try {
             //default color is black
-            Color c = Color.BLACK;
+            Color c = this.defaultColor;
             //default point size is 7
-            int size = 7;
+            int size = this.defaultSize;
 
-            double x = scan.nextDouble();
-            double y = scan.nextDouble();
 
-            //check to see if a custom color pattern has been specified, and apply it if so.
-            if(scan.hasNext(POINT_COLOR_PATTERN)) {
-               String color = scan.next(POINT_COLOR_PATTERN);
-               int start = 1, end = color.indexOf(',');
-               int r, g, b;
-               r = Integer.parseInt(color.substring(start, end));
-               start = end+1;
-               end = color.indexOf(',', start);
-               g = Integer.parseInt(color.substring(start, end));
-               b = Integer.parseInt(color.substring(end+1, color.length()-1));
-               c = new Color(r, g, b);
+            String in = scan.next();
+
+            Matcher pointMatcher = this.defaultData.matcher(in);
+            if(!pointMatcher.find()) {
+               continue;
             }
-            //check to see if a drawing size has been specified, and apply it if so.
-            if(scan.hasNext(POINT_SIZE_PATTERN)) {
-               String sizeStr = scan.next(POINT_SIZE_PATTERN);
-               size = Integer.parseInt(sizeStr.substring(1, sizeStr.length()-1));
+
+            String format = pointMatcher.group("F");
+
+            double x = Double.parseDouble(pointMatcher.group("x"));
+            double y = Double.parseDouble(pointMatcher.group("y"));
+
+
+            if(format != null) {
+
+               Matcher colorMatcher = POINT_COLOR_PATTERN.matcher(format);
+               if(colorMatcher.find()) {
+                  int r = Integer.parseInt(colorMatcher.group(1));
+                  int g = Integer.parseInt(colorMatcher.group(2));
+                  int b = Integer.parseInt(colorMatcher.group(3));
+                  c = new Color(r, g, b);
+               }
+
+               Matcher sizeMatcher = POINT_SIZE_PATTERN.matcher(format);
+               if(sizeMatcher.find()) {
+                  size = Integer.parseInt(sizeMatcher.group(1));
+               }
             }
 
             points.add(new Point(x, y, size, c, ax));
          } catch (Exception e) {
             scan.close();
             System.out.println(e.toString());
+            e.printStackTrace();
             throw new IllegalArgumentException("Malformed file");
          }
       }
